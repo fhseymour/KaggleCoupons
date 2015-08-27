@@ -1,0 +1,172 @@
+---
+title: "Kaggle Coupon Purchase Training Data Preliminary Analysis"
+author: "Fred H. Seymour"
+date: "08/27/2015"
+output: html_document
+---
+
+### Summary
+
+The Kaggle Coupon Purchase Prediction training dataset has 3 basic files consisting of a user list, a coupon training list, and a coupon visit training set.
+
+### Loading data
+Load data and format some attribute variables
+```{r}
+dir <- '/home/fred/LargeDatasets/KaggleCouponPrediction/'
+user_list <- read.csv(paste0(dir,"user_list.csv"), as.is=T)
+coupon_list_train <- read.csv(paste0(dir,"coupon_list_train_en.csv"), as.is=T)
+coupon_visit_train <- read.csv(paste0(dir,"coupon_visit_train.csv"), as.is=T, nrows=100000)
+purchase.tbl <- table(coupon_visit_train$PURCHASE_FLG)
+```
+
+```{r echo=FALSE}
+# Some data formatting turning attributes into appropriate variable types
+user_list$SEX_ID <- as.factor(user_list$SEX_ID)
+user_list$PREF_NAME <- as.factor(user_list$PREF_NAME)
+
+coupon_list_train$en_capsule <- as.factor(coupon_list_train$en_capsule)
+coupon_list_train$en_genre <- as.factor(coupon_list_train$en_genre)
+coupon_list_train$en_large_area <- as.factor(coupon_list_train$en_large_area)
+coupon_list_train$en_ken <- as.factor(coupon_list_train$en_ken)
+coupon_list_train$en_small_area <- as.factor(coupon_list_train$en_small_area)
+
+coupon_visit_train$PURCHASE_FLG <- as.factor(coupon_visit_train$PURCHASE_FLG)
+coupon_visit_train$I_DATE <- as.POSIXlt(coupon_visit_train$I_DATE, "%Y-%m-%d %H:%M:%S")
+```
+
+The user list has `r dim(user_list)[1]` users with `r dim(user_list)[2]` attributes.    
+The coupon list training set has `r dim(coupon_list_train)[1]` coupons with `r dim(coupon_list_train)[2]` attributes.   
+The coupon visit training set has `r dim(coupon_visit_train)[1]` coupon visits with `r dim(coupon_visit_train)[2]` attributes.   
+The coupon visits by users resulted in `r as.matrix(purchase.tbl)[1,1]` non-purchases and `r as.matrix(purchase.tbl)[2,1]` purchases for a purchase to visit ratio of `r sprintf('%.2f%%',100*as.matrix(purchase.tbl)[2,1]/dim(coupon_visit_train)[1])`.      
+
+### Basic Data Plots
+```{r}
+# Look at day of the week visit and purchase breakdown
+coupon_visit_train$day <- factor(weekdays(coupon_visit_train$I_DATE), 
+    levels=c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday", "Sunday"))
+daycount <- table(coupon_visit_train$day)
+daycount.bought <- table(coupon_visit_train$day[coupon_visit_train$PURCHASE_FLG==1])
+daycounts <- t(matrix(c(daycount-daycount.bought,daycount.bought),nrow=7, ncol=2))
+colnames(daycounts) <- names(daycount)
+barplot(daycounts, main="Coupon Visit/Purchase Counts by the Day",
+        ylab="Count", xlab="Day", cex.names=0.8, col=c("grey", "blue"))
+legend("topright", c("Purchase", "No Purchase"), cex=1.0, fill=c("blue","grey"))
+```
+.   
+For conciseness, the similar code listings for the subsequent plots are suppressed.      
+```{r, echo=FALSE}
+# Look at hourly breakdown
+coupon_visit_train$hour <- factor(coupon_visit_train$I_DATE$hour,levels=0:23)
+hourcount <- table(coupon_visit_train$hour)
+hourcount.bought <- table(coupon_visit_train$hour[coupon_visit_train$PURCHASE_FLG==1])
+hourcounts <- t(matrix(c(hourcount-hourcount.bought,hourcount.bought),nrow=24, ncol=2))
+colnames(hourcounts) <- names(hourcount)
+barplot(hourcounts, main="Coupon Visit/Purchase Counts by the Hour",
+        ylab="Count", xlab="Hour", cex.names=0.8, col=c("grey", "blue"))
+legend("topleft", c("Purchase", "No Purchase"), cex=1.0, fill=c("blue","grey"))
+# Look at weekly breakdown
+library(lubridate)
+coupon_visit_train$week <- factor(week(coupon_visit_train$I_DATE))
+weekcount <- table(coupon_visit_train$week)
+weekcount.bought <- table(coupon_visit_train$week[coupon_visit_train$PURCHASE_FLG==1])
+weekcounts <- t(matrix(c(weekcount-weekcount.bought,weekcount.bought),nrow=53, ncol=2))
+colnames(weekcounts) <- names(weekcount)
+barplot(weekcounts, main="Coupon Visit/Purchase Counts by the Week",
+        ylab="Count", xlab="Week", cex.names=0.8, ylim=c(0,3500), col=c("grey", "blue"))
+legend("topleft", c("Purchase", "No Purchase"), cex=1.0, fill=c("blue","grey"))
+```
+.   
+Look at view/purchase breakdown by user.   
+```{r}
+# Look at breakdown by user
+userPurchaseCount <- as.data.frame(table(coupon_visit_train$USER_ID_hash[coupon_visit_train$PURCHASE_FLG==1]))
+names(userPurchaseCount) <- c("USER_ID_hash","PurchaseCount")
+userVisitCount <- as.data.frame(table(coupon_visit_train$USER_ID_hash))
+names(userVisitCount) <- c("USER_ID_hash","VisitCount")
+user_listA <- merge(user_list, userPurchaseCount, by.x="USER_ID_hash", by.y="USER_ID_hash", all.x=TRUE)
+user_listA$PurchaseCount[is.na(user_listA$PurchaseCount)] <- 0
+user_listA <- merge(user_listA, userVisitCount, by.x="USER_ID_hash", by.y="USER_ID_hash", all.x=TRUE)
+user_listA$VisitCount[is.na(user_listA$VisitCount)] <- 0
+
+plot(user_listA$VisitCount[user_listA$SEX_ID=='f'], user_listA$PurchaseCount[user_listA$SEX_ID=='f'], col='red', cex=0.3, 
+     main="User Views Versus Purchases", ylab="User Purchase Count", xlab="User View Count")
+points(user_listA$VisitCount[user_listA$SEX_ID=='m'], user_listA$PurchaseCount[user_listA$SEX_ID=='m'], col='blue', cex=0.2)
+legend("topleft", c("Male", "Female"), fill=c("blue","red"))
+
+# 3D histogram of usercounts by age and purchased coupons (1 to 10)
+plot.table <- table(user_listA$PurchaseCount, user_listA$AGE)
+plot.table <- plot.table[2:11,] # limits coupons purchased from 1 to 10
+library(plot3D)
+hist3D(z=plot.table, main="User Counts of Age vs Purchase Count",
+       xlab="Purchase Count 1 to 10", ylab="Age 15 to 80", zlab="User Count")
+
+plot(density(user_list$AGE[user_list$SEX_ID=='f']),
+     main="Viewer Age", col='red', xlab='Age', ylim=c(0,0.035))
+lines(density(user_list$AGE[user_list$SEX_ID=='m']), col='blue')
+legend("topleft", c("Male 52%", "Female 48%"), fill=c("blue","red"))
+
+plot(density(user_listA$AGE[user_list$SEX_ID=='f' & user_listA$PurchaseCount>0]),
+     main="Purchaser Age", col='red', xlab='Age', ylim=c(0,0.035))
+lines(density(user_listA$AGE[user_list$SEX_ID=='m' & user_listA$PurchaseCount>0]), col='blue')
+legend("topleft", c("Male 53%", "Female 47%"), fill=c("blue","red"))
+```
+.   
+Look at coupon visit list breakdown by user and by coupon catgory   
+
+```{r}
+user_listA <- user_list[,c("SEX_ID","AGE","WITHDRAW_DATE", "PREF_NAME","USER_ID_hash")]
+coupon_visit_train <- merge(coupon_visit_train,user_listA,by.x="USER_ID_hash",by.y="USER_ID_hash")
+coupon_list_trainA <- coupon_list_train[,c("COUPON_ID_hash","PRICE_RATE","VALIDPERIOD","en_capsule",
+                                           "en_genre","en_large_area","en_ken","en_small_area")]
+coupon_visit_train <- merge(coupon_visit_train,coupon_list_trainA,by.x="VIEW_COUPON_ID_hash",by.y="COUPON_ID_hash")
+par(mar=c(10, 4, 2, 2) + 0.1) # make room for large vertical x-axis labels
+# genre by gender
+genrecountf <- table(coupon_visit_train$en_genre[coupon_visit_train$SEX_ID=='f'])
+genrecountf.bought <- table(coupon_visit_train$en_genre[coupon_visit_train$PURCHASE_FLG==1 & 
+                                                            coupon_visit_train$SEX_ID=='f'])
+genrecountm <- table(coupon_visit_train$en_genre[coupon_visit_train$SEX_ID=='m'])
+genrecountm.bought <- table(coupon_visit_train$en_genre[coupon_visit_train$PURCHASE_FLG==1 & 
+                                                            coupon_visit_train$SEX_ID=='m'])
+genrecounts <- t(matrix(c(genrecountf-genrecountf.bought,
+                          genrecountm-genrecountm.bought,
+                          genrecountf.bought,
+                          genrecountm.bought),nrow=length(genrecountf), ncol=4))
+colnames(genrecounts) <- names(genrecountf)
+barplot(genrecounts, main="Coupon Visit Counts by Genre",
+        ylab="Count", xlab="", cex.names=0.8, las=2, col=c("grey", "pink", "blue", "red"))
+legend("topright", c("Purchase Female", 
+                     "Purchase Male",
+                     "No Purchase Female",
+                     "No Purchase Male"), cex=1.0, 
+       fill=c("red", "blue","pink","grey"))
+# Look at ratio of purchased coupons over listed coupons by en_large_area
+coupons_listed <- table(coupon_list_train$en_large_area)
+coupons_purchased <- table(coupon_visit_train$en_large_area[coupon_visit_train$PURCHASE_FLG==1])
+barplot(coupons_purchased/coupons_listed, cex.names=0.8, las=2, ylab='coupons purchased/listed',
+        main='Purchased/Listed coupon ratio by large area') 
+
+# Look at ratio of purchased coupons  over listed coupons for en_genre
+coupons_listed <- table(coupon_list_train$en_genre)
+coupons_purchased <- table(coupon_visit_train$en_genre[coupon_visit_train$PURCHASE_FLG==1])
+barplot(coupons_purchased/coupons_listed, cex.names=0.8, las=2, ylab='coupons purchased/listed',
+        main='Purchased/Listed coupon ratio by genre') 
+
+# Look at ratio of purchased coupons  over listed coupons for en_capsule
+coupons_listed <- table(coupon_list_train$en_capsule)
+coupons_purchased <- table(coupon_visit_train$en_capsule[coupon_visit_train$PURCHASE_FLG==1])
+barplot(coupons_purchased/coupons_listed, cex.names=0.8, las=2, ylab='coupons purchased/listed',
+        main='Purchased/Listed coupon ratio by capsule') 
+
+# Look at ratio of purchased coupons  over listed coupons for en_ken
+coupons_listed <- table(coupon_list_train$en_ken)
+coupons_purchased <- table(coupon_visit_train$en_ken[coupon_visit_train$PURCHASE_FLG==1])
+barplot(coupons_purchased/coupons_listed, cex.names=0.8, las=2, ylab='coupons purchased/listed',
+        main='Purchased/Listed coupon ratio by ken')
+
+# Look at ratio of purchased coupons  over listed coupons for en_small_area
+coupons_listed <- table(coupon_list_train$en_small_area)
+coupons_purchased <- table(coupon_visit_train$en_small_area[coupon_visit_train$PURCHASE_FLG==1])
+barplot(coupons_purchased/coupons_listed, cex.names=0.8, las=2, ylab='coupons purchased/listed',
+        main='Purchased/Listed coupon ratio by small_area')
+
+```
