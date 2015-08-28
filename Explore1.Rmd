@@ -1,7 +1,7 @@
 ---
 title: "Kaggle Coupon Purchase Training Data Preliminary Analysis"
 author: "Fred H. Seymour"
-date: "08/27/2015"
+date: "08/28/2015"
 output: html_document
 ---
 
@@ -10,12 +10,18 @@ output: html_document
 The Kaggle Coupon Purchase Prediction training dataset has 3 basic files consisting of a user list, a coupon training list, and a coupon visit training set.
 
 ### Loading data
-Load data and format some attribute variables
+License text, initialize timer, load data and format some attribute variables
 ```{r}
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE.md' which is part of this source code package.
+
+# set start time
+start.time <- Sys.time()
+
 dir <- '/home/fred/LargeDatasets/KaggleCouponPrediction/'
 user_list <- read.csv(paste0(dir,"user_list.csv"), as.is=T)
 coupon_list_train <- read.csv(paste0(dir,"coupon_list_train_en.csv"), as.is=T)
-coupon_visit_train <- read.csv(paste0(dir,"coupon_visit_train.csv"), as.is=T, nrows=100000)
+coupon_visit_train <- read.csv(paste0(dir,"coupon_visit_train.csv"), as.is=T, nrows=-1)
 purchase.tbl <- table(coupon_visit_train$PURCHASE_FLG)
 ```
 
@@ -72,7 +78,7 @@ weekcount.bought <- table(coupon_visit_train$week[coupon_visit_train$PURCHASE_FL
 weekcounts <- t(matrix(c(weekcount-weekcount.bought,weekcount.bought),nrow=53, ncol=2))
 colnames(weekcounts) <- names(weekcount)
 barplot(weekcounts, main="Coupon Visit/Purchase Counts by the Week",
-        ylab="Count", xlab="Week", cex.names=0.8, ylim=c(0,3500), col=c("grey", "blue"))
+        ylab="Count", xlab="Week", cex.names=0.8, col=c("grey", "blue"))
 legend("topleft", c("Purchase", "No Purchase"), cex=1.0, fill=c("blue","grey"))
 ```
 .   
@@ -169,4 +175,6 @@ coupons_purchased <- table(coupon_visit_train$en_small_area[coupon_visit_train$P
 barplot(coupons_purchased/coupons_listed, cex.names=0.8, las=2, ylab='coupons purchased/listed',
         main='Purchased/Listed coupon ratio by small_area')
 
+stop.time <- Sys.time()
 ```
+R markdown file run time: `r difftime(stop.time,start.time,units="mins")` minutes
